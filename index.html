@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PureBox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <div id="app" class="app-layout">
+      <!-- 3-Pane Resizable Native Workspace (No Top Bar) -->
+      <div id="workspace" class="app-body">
+        <!-- 1. Left Sidebar: Mailbox Accounts -->
+        <aside id="pane-sidebar" class="pane sidebar-inboxes">
+          <!-- macOS Traffic Lights clearance / Top Drag Handle -->
+          <div class="sidebar-drag-header" data-tauri-drag-region>
+            <div class="window-controls-space"></div>
+            <div class="sidebar-brand-mark" data-tauri-drag-region>
+              <div class="brand-box-icon">
+                <i data-lucide="inbox" class="xs-icon"></i>
+              </div>
+              <span class="brand-title-text">purebox</span>
+            </div>
+            <div class="sidebar-top-actions">
+              <!-- Settings button -->
+              <button id="btn-open-settings" class="btn btn-ghost btn-xs" title="Settings & API Key">
+                <i data-lucide="settings" class="sm-icon"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Primary Creation Bar -->
+          <div class="sidebar-cta-section">
+            <button id="btn-generate-email" class="btn btn-primary btn-block">
+              <i data-lucide="plus" class="btn-icon"></i>
+              <span>New Disposable</span>
+              <span class="btn-kbd">⌘N</span>
+            </button>
+
+            <!-- Domain Selector Pill -->
+            <div class="sidebar-domain-select-wrap">
+              <i data-lucide="globe" class="xs-icon text-muted"></i>
+              <select id="domain-select" class="sidebar-domain-select" title="Target domain for generated mailboxes">
+                <option value="">Loading domains...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pane-header">
+            <div class="pane-header-title">
+              <span>Mailboxes</span>
+              <span id="inboxes-count" class="pill-count">0</span>
+            </div>
+            <div class="search-input-wrap">
+              <i data-lucide="search" class="search-icon"></i>
+              <input
+                type="text"
+                id="search-inboxes"
+                placeholder="Search by address or tag..."
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <div id="inbox-list" class="inbox-list-scroll">
+            <!-- Mailbox Cards rendered dynamically -->
+          </div>
+
+          <div class="pane-footer sidebar-footer-bar">
+            <!-- Purelymail Credit & Status -->
+            <div class="sidebar-status-group">
+              <div id="credit-badge" class="footer-credit-badge hidden" title="Current Purelymail account credit">
+                <span class="meta-label">Credit:</span>
+                <span id="credit-amount" class="meta-val">--</span>
+              </div>
+              <div class="sidebar-pulse-dot" title="IMAP Listener Active">
+                <span class="status-dot-pulse"></span>
+                <span id="header-status" class="status-text-tiny">Connected</span>
+              </div>
+            </div>
+
+            <button id="btn-clear-all-inboxes" class="btn-action-link text-danger" title="Purge all temporary inboxes from server">
+              <i data-lucide="trash-2" class="xs-icon"></i>
+              <span>Purge All</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Resizer Divider 1 -->
+        <div id="resizer-1" class="pane-resizer" title="Drag to resize sidebar"></div>
+
+        <!-- 2. Middle Pane: Email Messages List -->
+        <section id="pane-messages" class="pane messages-pane">
+          <!-- Middle Pane Drag Header -->
+          <div class="pane-drag-header" data-tauri-drag-region>
+            <div class="pane-drag-title">
+              <span>Messages</span>
+              <span id="messages-count-badge" class="pill-count">0</span>
+            </div>
+            <div class="pane-drag-actions">
+              <span id="auto-sync-timer" class="sync-timer-text">Sync: 10s</span>
+              <button id="btn-toggle-sidebar" class="btn btn-ghost btn-xs" title="Toggle Sidebar (\)">
+                <i data-lucide="panel-left" class="xs-icon"></i>
+              </button>
+              <button id="btn-sync-now" class="btn btn-ghost btn-xs" title="Check for new mail (R)">
+                <i data-lucide="refresh-cw" class="xs-icon" id="sync-icon"></i>
+              </button>
+              <button id="btn-compose-mail" class="btn btn-secondary btn-xs" title="Compose message from this address (C)">
+                <i data-lucide="send" class="xs-icon"></i>
+                <span>Compose</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="messages-controls-header">
+            <!-- Active account banner with copy credentials & label note -->
+            <div id="active-account-bar" class="active-account-bar hidden">
+              <div class="account-top-row">
+                <div class="account-email-info">
+                  <span id="active-email-display" class="active-email-text"></span>
+                  <button id="btn-copy-active-email" class="icon-btn-tiny" title="Copy Address">
+                    <i data-lucide="copy" class="xs-icon"></i>
+                  </button>
+                  <button id="btn-copy-active-pwd" class="icon-btn-tiny" title="Copy Password">
+                    <i data-lucide="key" class="xs-icon"></i>
+                  </button>
+                  <button id="btn-copy-full-creds" class="icon-btn-tiny" title="Copy Full Credentials">
+                    <i data-lucide="clipboard-list" class="xs-icon"></i>
+                  </button>
+                </div>
+                <div class="account-actions">
+                  <button id="btn-open-webmail" class="link-btn-tiny" title="Open Purelymail Webmail">
+                    <i data-lucide="external-link" class="xs-icon"></i>
+                    <span>Webmail</span>
+                  </button>
+                  <button id="btn-delete-active-inbox" class="link-btn-tiny text-danger" title="Delete this account from server">
+                    <i data-lucide="trash" class="xs-icon"></i>
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick Mailbox Purpose Tag / Note -->
+              <div class="account-tag-row">
+                <i data-lucide="tag" class="xs-icon text-muted"></i>
+                <input
+                  type="text"
+                  id="active-inbox-tag-input"
+                  placeholder="Add label / tag (e.g. Netflix, Figma, AWS)..."
+                  class="inbox-tag-input"
+                />
+              </div>
+            </div>
+
+            <!-- Filter Chips & Search -->
+            <div class="messages-filters-row">
+              <div class="filter-chips">
+                <button class="filter-chip active" data-filter="all" id="filter-all">All</button>
+                <button class="filter-chip" data-filter="unread" id="filter-unread">Unread</button>
+                <button class="filter-chip" data-filter="otp" id="filter-otp">With Code / Links</button>
+              </div>
+            </div>
+
+            <div class="search-input-wrap">
+              <i data-lucide="search" class="search-icon"></i>
+              <input
+                type="text"
+                id="search-messages"
+                placeholder="Filter messages..."
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <div id="messages-list" class="messages-list-scroll">
+            <!-- Messages rendered dynamically -->
+          </div>
+        </section>
+
+        <!-- Resizer Divider 2 -->
+        <div id="resizer-2" class="pane-resizer" title="Drag to resize message list"></div>
+
+        <!-- 3. Right Pane: Email Detail Viewer -->
+        <main id="pane-reading" class="pane reading-pane">
+          <!-- Reading Pane Top Drag Bar -->
+          <div class="reading-drag-header" data-tauri-drag-region>
+            <div class="reading-drag-left">
+              <button id="btn-restore-columns" class="btn btn-secondary btn-xs hidden" title="Restore Columns (\)">
+                <i data-lucide="chevron-left" class="xs-icon"></i>
+                <span>All Messages</span>
+              </button>
+            </div>
+            <div class="reading-drag-spacer" data-tauri-drag-region></div>
+            <div class="reading-utility-actions">
+              <!-- Full view collapse toggle -->
+              <button id="btn-toggle-expand-reader" class="btn btn-ghost btn-xs" title="Expand Fullscreen Reader (\)">
+                <i data-lucide="maximize-2" class="xs-icon" id="expand-icon"></i>
+                <span class="btn-text-responsive" id="expand-btn-text">Full View</span>
+              </button>
+
+              <!-- Keyboard shortcuts helper -->
+              <button id="btn-open-shortcuts" class="btn btn-ghost btn-xs" title="Keyboard Shortcuts (?)">
+                <i data-lucide="command" class="xs-icon"></i>
+                <span class="kbd-hint">?</span>
+              </button>
+
+              <!-- Audio toggle -->
+              <button id="btn-toggle-sound" class="btn btn-ghost btn-xs" title="Toggle audio alerts">
+                <i data-lucide="volume-2" class="xs-icon" id="sound-icon"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="email-detail-empty" class="reading-empty-state">
+            <div class="empty-icon-wrap">
+              <i data-lucide="mail" class="empty-icon"></i>
+            </div>
+            <h3>No Message Selected</h3>
+            <p>Select an email from the list to view its contents, or create a disposable mailbox to receive mail.</p>
+            <div class="empty-shortcuts">
+              <span>Shortcuts: <kbd class="kbd">J</kbd> / <kbd class="kbd">K</kbd> to navigate, <kbd class="kbd">C</kbd> to compose, <kbd class="kbd">⌘N</kbd> for new mailbox</span>
+            </div>
+          </div>
+
+          <div id="email-detail-container" class="email-detail-container hidden">
+            <!-- Email Viewer Header -->
+            <div class="detail-header">
+              <div class="detail-subject-line">
+                <h1 id="email-detail-subject" class="email-subject-heading">Subject</h1>
+                <div class="detail-top-actions">
+                  <button id="btn-toggle-email-theme" class="btn btn-secondary btn-xs" title="Toggle dark/light reader canvas">
+                    <i data-lucide="sun" class="xs-icon" id="theme-toggle-icon"></i>
+                    <span id="theme-toggle-text">Light Canvas</span>
+                  </button>
+                  <button id="btn-export-eml" class="btn btn-secondary btn-xs" title="Download Raw Email (.eml)">
+                    <i data-lucide="download" class="xs-icon"></i>
+                    <span>Export</span>
+                  </button>
+                  <button id="btn-reply-email" class="btn btn-secondary btn-xs" title="Reply">
+                    <i data-lucide="reply" class="xs-icon"></i>
+                    <span>Reply</span>
+                  </button>
+                  <button id="btn-delete-email" class="btn btn-secondary btn-xs text-danger" title="Delete message">
+                    <i data-lucide="trash-2" class="xs-icon"></i>
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- OTP Code Helper Card -->
+              <div id="otp-highlight-banner" class="otp-highlight-banner hidden">
+                <div class="otp-left">
+                  <i data-lucide="shield-check" class="otp-check-icon"></i>
+                  <div>
+                    <span class="otp-title">Verification / OTP Code Detected</span>
+                    <span id="otp-code-value" class="otp-code">--</span>
+                  </div>
+                </div>
+                <button id="btn-copy-otp" class="btn btn-primary btn-xs">
+                  <i data-lucide="copy" class="xs-icon"></i>
+                  <span>Copy Code</span>
+                </button>
+              </div>
+
+              <!-- Primary Link / Confirmation Action Banner -->
+              <div id="link-highlight-banner" class="link-highlight-banner hidden">
+                <div class="link-left">
+                  <i data-lucide="link" class="link-check-icon"></i>
+                  <div>
+                    <span class="link-title">Primary Action / Confirmation Link</span>
+                    <span id="link-url-preview" class="link-url-preview">--</span>
+                  </div>
+                </div>
+                <button id="btn-open-detected-link" class="btn btn-secondary btn-xs">
+                  <i data-lucide="external-link" class="xs-icon"></i>
+                  <span>Open in Browser</span>
+                </button>
+              </div>
+
+              <!-- Sender & Recipient Meta -->
+              <div class="detail-meta-row">
+                <div class="sender-avatar" id="email-sender-avatar">U</div>
+                <div class="sender-meta-text">
+                  <div class="sender-primary-line">
+                    <span id="email-detail-from" class="sender-from-name">Sender</span>
+                    <span id="email-detail-date" class="meta-date">Date</span>
+                  </div>
+                  <div class="sender-sub-line">
+                    <span class="meta-dim">To:</span>
+                    <span id="email-detail-to" class="meta-to">Recipient</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab switcher -->
+              <div class="detail-tabs">
+                <button id="tab-rendered-html" class="tab-item active">
+                  <i data-lucide="layout" class="xs-icon"></i>
+                  <span>Rendered HTML</span>
+                </button>
+                <button id="tab-plain-text" class="tab-item">
+                  <i data-lucide="file-text" class="xs-icon"></i>
+                  <span>Plain Text</span>
+                </button>
+                <button id="tab-raw-headers" class="tab-item">
+                  <i data-lucide="code" class="xs-icon"></i>
+                  <span>Raw Headers</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Email Body Frame & Content -->
+            <div class="detail-body-area">
+              <div id="view-rendered-html" class="body-view email-canvas-dark">
+                <iframe id="email-html-frame" sandbox="allow-same-origin allow-popups" title="Email Body"></iframe>
+              </div>
+
+              <div id="view-plain-text" class="body-view hidden">
+                <pre id="email-plain-content" class="plain-body-content"></pre>
+              </div>
+
+              <div id="view-raw-headers" class="body-view hidden">
+                <div class="raw-headers-content" id="email-headers-content"></div>
+              </div>
+
+              <!-- Attachments List -->
+              <div id="attachments-container" class="attachments-bar hidden">
+                <span class="attachments-label">
+                  <i data-lucide="paperclip" class="xs-icon"></i>
+                  <span>Attachments</span>
+                </span>
+                <div id="attachments-list" class="attachments-flex"></div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- Compose Email Modal -->
+      <div id="modal-compose" class="modal-overlay hidden">
+        <div class="modal-window modal-lg">
+          <div class="modal-header">
+            <div class="modal-header-title">
+              <i data-lucide="send" class="sm-icon"></i>
+              <span>Compose Message</span>
+            </div>
+            <button id="btn-close-compose" class="modal-close-btn">&times;</button>
+          </div>
+          <form id="compose-form" class="modal-body">
+            <div class="form-row">
+              <label for="compose-from">From</label>
+              <input type="email" id="compose-from" readonly class="form-input bg-readonly font-mono" />
+            </div>
+            <div class="form-row">
+              <label for="compose-to">To</label>
+              <input type="email" id="compose-to" placeholder="recipient@example.com" required class="form-input font-mono" />
+            </div>
+            <div class="form-row">
+              <label for="compose-subject">Subject</label>
+              <input type="text" id="compose-subject" placeholder="Subject" required class="form-input" />
+            </div>
+            <div class="form-row">
+              <label for="compose-body">Message</label>
+              <textarea id="compose-body" rows="9" placeholder="Write your message..." required class="form-input font-sans"></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" id="btn-cancel-compose" class="btn btn-secondary btn-sm">Cancel</button>
+              <button type="submit" id="btn-send-email-submit" class="btn btn-primary btn-sm">
+                <i data-lucide="send" class="btn-icon"></i>
+                <span>Send</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Settings Modal -->
+      <div id="modal-settings" class="modal-overlay hidden">
+        <div class="modal-window modal-md">
+          <div class="modal-header">
+            <div class="modal-header-title">
+              <i data-lucide="settings" class="sm-icon"></i>
+              <span>Settings</span>
+            </div>
+            <button id="btn-close-settings" class="modal-close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="settings-group">
+              <label class="group-label">Purelymail API Token</label>
+              <p class="group-help">Obtained from Purelymail Account Settings &rarr; API Tokens.</p>
+              <div class="token-input-row">
+                <input
+                  type="password"
+                  id="setting-api-token"
+                  placeholder="Enter API Token..."
+                  class="form-input font-mono"
+                />
+                <button type="button" id="btn-toggle-token-visibility" class="btn-inline-toggle" title="Toggle visibility">
+                  <i data-lucide="eye" class="sm-icon" id="token-eye-icon"></i>
+                </button>
+              </div>
+              <div class="settings-test-row">
+                <button id="btn-test-connection" class="btn btn-secondary btn-xs">
+                  <i data-lucide="check-circle-2" class="sm-icon"></i>
+                  <span>Test Connection</span>
+                </button>
+                <span id="connection-test-result" class="test-feedback"></span>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label class="group-label" for="setting-custom-prefix">Username Prefix (Optional)</label>
+              <p class="group-help">Alphanumeric prefix (e.g. 'dev', 'qa', or leave empty for auto-names).</p>
+              <input
+                type="text"
+                id="setting-custom-prefix"
+                placeholder="Leave blank for natural words (e.g. cloudtiger82)"
+                class="form-input"
+              />
+            </div>
+
+            <div class="settings-group">
+              <label class="group-label" for="setting-sync-interval">IMAP Auto-Sync Interval</label>
+              <select id="setting-sync-interval" class="form-input">
+                <option value="5">Every 5 seconds</option>
+                <option value="10" selected>Every 10 seconds (Recommended)</option>
+                <option value="30">Every 30 seconds</option>
+                <option value="60">Every 1 minute</option>
+                <option value="0">Manual only</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="btn-save-settings" class="btn btn-primary btn-sm">
+              <i data-lucide="save" class="btn-icon"></i>
+              <span>Save Settings</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmation Modal -->
+      <div id="modal-confirm" class="modal-overlay hidden">
+        <div class="modal-window modal-sm">
+          <div class="modal-header">
+            <div class="modal-header-title">
+              <i data-lucide="alert-circle" id="confirm-modal-icon" class="sm-icon text-danger"></i>
+              <span id="confirm-modal-title">Confirm Action</span>
+            </div>
+            <button id="btn-close-confirm" class="modal-close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p id="confirm-modal-message" class="confirm-text">Are you sure?</p>
+          </div>
+          <div class="modal-footer">
+            <button id="btn-cancel-confirm" class="btn btn-secondary btn-sm">Cancel</button>
+            <button id="btn-action-confirm" class="btn btn-primary btn-sm text-danger">
+              <span id="confirm-modal-btn-text">Confirm</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Keyboard Shortcuts Modal -->
+      <div id="modal-shortcuts" class="modal-overlay hidden">
+        <div class="modal-window modal-md">
+          <div class="modal-header">
+            <div class="modal-header-title">
+              <i data-lucide="command" class="sm-icon"></i>
+              <span>Keyboard Shortcuts</span>
+            </div>
+            <button id="btn-close-shortcuts" class="modal-close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="shortcuts-table">
+              <div class="shortcut-item">
+                <span>New disposable mailbox</span>
+                <div class="keys-wrap"><kbd>⌘</kbd><kbd>N</kbd> or <kbd>G</kbd></div>
+              </div>
+              <div class="shortcut-item">
+                <span>Sync active inbox</span>
+                <div class="keys-wrap"><kbd>R</kbd> or <kbd>⌘</kbd><kbd>R</kbd></div>
+              </div>
+              <div class="shortcut-item">
+                <span>Compose new email</span>
+                <div class="keys-wrap"><kbd>C</kbd></div>
+              </div>
+              <div class="shortcut-item">
+                <span>Navigate messages up / down</span>
+                <div class="keys-wrap"><kbd>K</kbd> / <kbd>J</kbd></div>
+              </div>
+              <div class="shortcut-item">
+                <span>Delete selected message</span>
+                <div class="keys-wrap"><kbd>⌫</kbd> or <kbd>E</kbd></div>
+              </div>
+              <div class="shortcut-item">
+                <span>Open Settings</span>
+                <div class="keys-wrap"><kbd>⌘</kbd><kbd>,</kbd></div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="btn-dismiss-shortcuts" class="btn btn-secondary btn-sm">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast Container -->
+      <div id="toast-container" class="toast-container"></div>
+    </div>
+  </body>
+</html>
